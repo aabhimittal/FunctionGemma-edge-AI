@@ -1,0 +1,7 @@
+# The demo and tests run on the Python standard library alone — no installs needed.
+#
+# Only install these if you want to swap in a real Gemma checkpoint via
+# functiongemma.model.real_backend():
+#
+# transformers>=4.40
+# torch>=2.0
