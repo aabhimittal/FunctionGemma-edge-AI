@@ -1,0 +1,20 @@
+# Default runtime configuration. Every knob the pipeline reads lives here so a
+# run is reproducible from one file. Override any value with an FG_<UPPER> env
+# var (e.g. FG_PORT=9000) — see functiongemma/config.py.
+
+# data / eval
+catalog_path: data/tools_catalog.json
+eval_path: data/eval/golden.jsonl
+
+# cascade / calibration
+tau: 0.5                 # abstention threshold; overwritten by a fitted calibrator.
+target_accuracy: 0.9     # selective-accuracy floor the calibrator holds.
+
+# serving
+host: 0.0.0.0
+port: 8000
+event_log_path: events.jsonl
+
+# registry / promotion gate
+registry_root: registry
+min_tool_accuracy: 0.8   # candidates below this never reach production.

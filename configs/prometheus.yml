@@ -1,0 +1,8 @@
+# Minimal Prometheus scrape config for the FunctionGemma edge server.
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: functiongemma
+    static_configs:
+      - targets: ["functiongemma:8000"]

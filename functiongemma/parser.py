@@ -4,12 +4,17 @@ Models sometimes wrap JSON in extra text or hallucinate an argument. On the
 edge there is no big server to clean this up, so validation must be cheap and
 strict: extract the JSON, check the tool exists, and check the arguments match
 the schema. A bad call is rejected rather than executed.
+
+``parse`` handles raw model text (extract JSON, then validate). ``validate``
+takes an already-parsed ``{"name", "arguments"}`` dict and enforces the same
+rules — the cascade uses it after schema-constrained decoding
+(``functiongemma.constrained``) has produced a candidate call.
 """
 
 import json
 import re
 
-from .tools import get_tool
+from .tools import TOOLS, get_tool
 
 
 class InvalidCall(Exception):
@@ -19,7 +24,7 @@ class InvalidCall(Exception):
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
 
-def parse(raw_output):
+def parse(raw_output, tools=TOOLS):
     """Turn raw model text into a validated {'name', 'arguments'} dict."""
     match = _JSON_RE.search(raw_output)
     if not match:
@@ -30,11 +35,19 @@ def parse(raw_output):
     except json.JSONDecodeError as exc:
         raise InvalidCall(f"malformed JSON: {exc}") from exc
 
+    return validate(call, tools)
+
+
+def validate(call, tools=TOOLS):
+    """Validate an already-parsed call dict against the tool schema."""
+    if not isinstance(call, dict):
+        raise InvalidCall("call must be an object")
+
     name = call.get("name")
     if name is None:
         raise InvalidCall("model abstained: no tool selected")
 
-    tool = get_tool(name)
+    tool = get_tool(name, tools)
     if tool is None:
         raise InvalidCall(f"unknown tool: {name!r}")
 

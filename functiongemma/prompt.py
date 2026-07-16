@@ -7,7 +7,6 @@ reply with ONE JSON object. This "output contract" is what makes parsing easy.
 
 import json
 
-
 SYSTEM = (
     "You are FunctionGemma, a function-calling assistant. "
     "Choose exactly one tool and reply ONLY with JSON like "

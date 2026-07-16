@@ -1,0 +1,20 @@
+# Local stack: the edge server plus a Prometheus that scrapes its /metrics.
+# `docker compose up` then hit http://localhost:8000/docs and
+# http://localhost:9090 (Prometheus).
+services:
+  functiongemma:
+    build: .
+    image: functiongemma-edge:local
+    ports:
+      - "8000:8000"
+    environment:
+      FG_CONFIG: configs/default.yaml
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - functiongemma

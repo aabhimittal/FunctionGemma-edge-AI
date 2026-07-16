@@ -1,6 +1,15 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ruff_cache/
 .venv/
 venv/
 *.egg-info/
+
+# Generated pipeline artifacts (reproducible from `make pipeline`).
+metrics.json
+calibrator.json
+events.jsonl
+registry/
+artifacts/
+data/train.jsonl

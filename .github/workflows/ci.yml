@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: lint · test · eval-gate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Verify pipelines run (dry-run, no model download)
+        run: |
+          python -m pipelines.generate_data --n 100 --out data/train.jsonl
+          python -m pipelines.train --dry-run
+          python -m pipelines.quantize --dry-run
+
+      - name: Evaluation gate (blocks merge on regression)
+        run: |
+          python -m pipelines.evaluate --out metrics.json --fit-calibrator calibrator.json
+          python -m pipelines.promote --metrics metrics.json --calibrator calibrator.json --config configs/default.yaml
+
+      - name: Upload metrics artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-${{ matrix.python-version }}
+          path: |
+            metrics.json
+            calibrator.json
+          if-no-files-found: ignore

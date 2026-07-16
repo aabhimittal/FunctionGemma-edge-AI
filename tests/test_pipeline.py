@@ -2,7 +2,7 @@
 
 import unittest
 
-from functiongemma import run, parse, InvalidCall
+from functiongemma import InvalidCall, parse, run
 
 
 class TestPipeline(unittest.TestCase):

@@ -1,0 +1,5 @@
+# Dev + CI tooling. Installs the serving deps so the whole suite runs.
+-r requirements-serve.txt
+pytest>=8.0
+ruff>=0.4
+pyyaml>=6.0            # optional config format; exercised by tests

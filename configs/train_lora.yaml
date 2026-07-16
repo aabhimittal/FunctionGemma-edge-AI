@@ -1,0 +1,19 @@
+# Hyper-parameters for the LoRA fine-tune (pipelines/train.py). Kept in version
+# control so every trained adapter is traceable to the exact config that made it.
+base_model: google/gemma-2-2b
+output_dir: artifacts/adapter
+
+# LoRA — adapt a few million low-rank params instead of all 2B.
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+target_modules: [q_proj, k_proj, v_proj, o_proj]
+
+# Optimisation
+epochs: 3
+batch_size: 8
+learning_rate: 0.0002
+
+# Data
+train_data: data/train.jsonl
+negative_ratio: 0.2      # fraction of abstention (hard-negative) examples.
