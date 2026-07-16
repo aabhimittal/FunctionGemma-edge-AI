@@ -1,0 +1,43 @@
+{
+  "version": "1.2.0",
+  "description": "Production tool catalogue for FunctionGemma. This file is the single source of truth loaded by functiongemma.tools at import time; the training data generator, evaluator and server all read the same schema so edge and cloud never disagree on the contract.",
+  "tools": [
+    {
+      "name": "get_weather",
+      "description": "Get the current weather for a city.",
+      "parameters": {
+        "city": {"type": "string", "description": "City name, e.g. 'Paris'"}
+      }
+    },
+    {
+      "name": "set_timer",
+      "description": "Start a countdown timer.",
+      "parameters": {
+        "minutes": {"type": "integer", "description": "Duration in minutes"}
+      }
+    },
+    {
+      "name": "send_message",
+      "description": "Send a text message to a contact.",
+      "parameters": {
+        "to": {"type": "string", "description": "Contact name"},
+        "body": {"type": "string", "description": "Message text"}
+      }
+    },
+    {
+      "name": "create_calendar_event",
+      "description": "Create a calendar event at a given time.",
+      "parameters": {
+        "title": {"type": "string", "description": "Event title"},
+        "hour": {"type": "integer", "description": "Hour of day, 0-23"}
+      }
+    },
+    {
+      "name": "play_music",
+      "description": "Play a song or artist on the device.",
+      "parameters": {
+        "query": {"type": "string", "description": "Song or artist to play"}
+      }
+    }
+  ]
+}

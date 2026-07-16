@@ -1,0 +1,16 @@
+{"request": "What's the weather in Paris?", "expected": {"name": "get_weather", "arguments": {"city": "Paris"}}}
+{"request": "Tell me the weather in Tokyo", "expected": {"name": "get_weather", "arguments": {"city": "Tokyo"}}}
+{"request": "Set a timer for 10 minutes", "expected": {"name": "set_timer", "arguments": {"minutes": 10}}}
+{"request": "Remind me in 5 minutes", "expected": {"name": "set_timer", "arguments": {"minutes": 5}}}
+{"request": "Send a message to Alex", "expected": {"name": "send_message", "arguments": {"to": "Alex"}}}
+{"request": "Text Mom that I'm running late", "expected": {"name": "send_message", "arguments": {"to": "Mom"}}}
+{"request": "Schedule a meeting at 3", "expected": {"name": "create_calendar_event", "arguments": {"hour": 3}}}
+{"request": "Put a meeting on my calendar at 11", "expected": {"name": "create_calendar_event", "arguments": {"hour": 11}}}
+{"request": "Play some music", "expected": {"name": "play_music", "arguments": {"query": "music"}}}
+{"request": "Play Radiohead", "expected": {"name": "play_music", "arguments": {"query": "radiohead"}}}
+{"request": "Tell me a joke", "expected": {"name": null, "arguments": {}}}
+{"request": "What is the meaning of life?", "expected": {"name": null, "arguments": {}}}
+{"request": "How are you feeling today?", "expected": {"name": null, "arguments": {}}}
+{"request": "Set a timer for 30 minutes", "expected": {"name": "set_timer", "arguments": {"minutes": 30}}}
+{"request": "What's the weather in Berlin?", "expected": {"name": "get_weather", "arguments": {"city": "Berlin"}}}
+{"request": "Message Sam", "expected": {"name": "send_message", "arguments": {"to": "Sam"}}}

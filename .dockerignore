@@ -1,0 +1,17 @@
+.git
+.github
+tests
+benchmarks
+docs
+pipelines
+artifacts
+registry
+*.jsonl
+metrics.json
+calibrator.json
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+requirements-ml.txt
+requirements-dev.txt

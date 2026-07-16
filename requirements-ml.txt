@@ -1,0 +1,11 @@
+# HEAVY, optional. Only needed to train a real model or export an edge artifact
+# (pipelines/train.py, pipelines/quantize.py) — never installed in CI.
+transformers>=4.42
+torch>=2.2
+datasets>=2.19
+peft>=0.11
+trl>=0.9
+accelerate>=0.30
+# Edge export (choose per target):
+# optimum[onnxruntime]>=1.20   # int8 ONNX
+# bitsandbytes>=0.43           # int4/int8 on GPU

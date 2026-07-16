@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "functiongemma-edge"
+version = "0.2.0"
+description = "A compact, confidence-gated function-calling specialist for the edge, with an end-to-end MLops pipeline."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "FunctionGemma-edge-AI contributors" }]
+keywords = ["function-calling", "gemma", "edge", "llm", "mlops", "on-device"]
+
+# The core library has zero runtime dependencies.
+dependencies = []
+
+[project.optional-dependencies]
+serve = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.29",
+  "pydantic>=2.6",
+]
+ml = [
+  "transformers>=4.42",
+  "torch>=2.2",
+  "datasets>=2.19",
+  "peft>=0.11",
+  "trl>=0.9",
+  "accelerate>=0.30",
+]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.4",
+  "pyyaml>=6.0",
+  "httpx>=0.27",
+]
+
+[project.scripts]
+functiongemma = "demo:main"
+
+[tool.setuptools]
+packages = ["functiongemma", "pipelines", "serving"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# Sensible default rule set: pyflakes, pycodestyle, isort, bugbear, pyupgrade.
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]  # long lines in docstrings/tables are intentional.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Put the repo root on sys.path so `pytest` (console script) resolves the
+# in-tree packages without an editable install — matches `python -m pytest`.
+pythonpath = ["."]

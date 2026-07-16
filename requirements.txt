@@ -1,7 +1,7 @@
-# The demo and tests run on the Python standard library alone — no installs needed.
+# Core library, demo and tests run on the Python standard library alone.
+# There is nothing to install to run `python demo.py`, the pipelines' --dry-run
+# paths, or the pure-Python test suite.
 #
-# Only install these if you want to swap in a real Gemma checkpoint via
-# functiongemma.model.real_backend():
-#
-# transformers>=4.40
-# torch>=2.0
+#   Serving layer .............. pip install -r requirements-serve.txt
+#   Real model / train / export  pip install -r requirements-ml.txt
+#   Dev tooling (lint, test) ... pip install -r requirements-dev.txt
