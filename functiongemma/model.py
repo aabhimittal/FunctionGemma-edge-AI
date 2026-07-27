@@ -32,7 +32,10 @@ def mock_backend(prompt):
         return json.dumps({"name": "get_weather", "arguments": {"city": city.title()}})
 
     if "timer" in request or "remind" in request:
-        minutes = _first_int(request) or 5
+        minutes = _first_int(request)
+        # A faithful model echoes the number the user said — even a bad one
+        # like 0. Deciding whether 0 is *sane* is the guard's job, not ours.
+        minutes = 5 if minutes is None else minutes
         return json.dumps({"name": "set_timer", "arguments": {"minutes": minutes}})
 
     if "message" in request or "text " in request or request.startswith("send"):
@@ -49,7 +52,16 @@ def mock_backend(prompt):
         )
 
     if "play" in request or "song" in request or "music" in request:
-        query = _guess_value(request, after=("play", "by")) or "music"
+        # Everything after "play" is the query ("play simon and garfunkel"
+        # must stay whole), minus filler words; else a single-word guess.
+        if "play" in request:
+            tail = request.split("play", 1)[1].split()
+            while tail and tail[0] in ("some", "a", "the", "me"):
+                tail.pop(0)
+            query = " ".join(tail)
+        else:
+            query = _guess_value(request, after=("by",))
+        query = query or "music"
         return json.dumps({"name": "play_music", "arguments": {"query": query}})
 
     # No confident match: the model is allowed to abstain.
