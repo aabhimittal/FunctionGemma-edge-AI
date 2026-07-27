@@ -1,5 +1,5 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Production tool catalogue for FunctionGemma. This file is the single source of truth loaded by functiongemma.tools at import time; the training data generator, evaluator and server all read the same schema so edge and cloud never disagree on the contract.",
   "tools": [
     {
@@ -13,7 +13,7 @@
       "name": "set_timer",
       "description": "Start a countdown timer.",
       "parameters": {
-        "minutes": {"type": "integer", "description": "Duration in minutes"}
+        "minutes": {"type": "integer", "description": "Duration in minutes", "minimum": 1, "maximum": 1440}
       }
     },
     {
@@ -29,7 +29,7 @@
       "description": "Create a calendar event at a given time.",
       "parameters": {
         "title": {"type": "string", "description": "Event title"},
-        "hour": {"type": "integer", "description": "Hour of day, 0-23"}
+        "hour": {"type": "integer", "description": "Hour of day, 0-23", "minimum": 0, "maximum": 23}
       }
     },
     {
