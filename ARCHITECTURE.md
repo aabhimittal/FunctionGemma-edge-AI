@@ -71,6 +71,12 @@ sequenceDiagram
 | Shipping safely | `evaluate.py`, `promote.py`, `registry.py` | eval gate guards the production pointer |
 | Fitting on-device | `quantize.py` | int4/int8 export, footprint budget |
 | Operating it | `serving/app.py`, `telemetry.py` | health, Prometheus metrics, event log |
+| Executing safely | `guard.py`, `planner.py`, `executor.py` | policy + multi-intent + sandboxed dispatch |
+| Scaling the catalogue | `retrieval.py` | BM25 top-k so the prompt fits the context window |
+| Capping cloud cost | `budget.py` | online controller holds a target escalation rate |
+| Surviving the network | `reliability.py` | circuit breaker + deadline → graceful degradation |
+| Catching regressions | `monitor.py` | rolling rates + confidence-drift PSI, with alerts |
+| Protecting user data | `privacy.py` | PII redaction at the log boundary |
 
 ## The feedback loop
 

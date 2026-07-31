@@ -13,8 +13,13 @@ MLops layer:
 
 Runtime layer (request lifecycle on the device):
     guard (policy+sanitization)  ·  planner (multi-intent)  ·  executor (agent)
+
+Scale & operations layer (production hardening):
+    retrieval (large catalogues)  ·  budget (adaptive cost control)  ·
+    reliability (circuit breaker)  ·  monitor (drift)  ·  privacy (PII redaction)
 """
 
+from .budget import EscalationBudgetController
 from .cascade import Cascade, Decision, coverage_report
 from .confidence import Calibrator, score
 from .config import Config, load_config
@@ -22,14 +27,18 @@ from .constrained import constrain
 from .executor import IMPLEMENTATIONS, Agent, execute
 from .guard import Guardrail, Verdict, screen_request
 from .model import cloud_backend, generate, mock_backend
+from .monitor import HealthMonitor, psi
 from .parser import InvalidCall, parse, validate
 from .planner import Plan, Planner
+from .privacy import Redactor, default_redactor
 from .prompt import build_prompt, pretty
 from .registry import ModelRegistry
+from .reliability import CircuitBreaker, CircuitOpen, guarded_call
+from .retrieval import ToolRetriever
 from .telemetry import Telemetry
 from .tools import TOOLS, get_tool, load_tools
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 
 def run(user_request, backend=mock_backend):
@@ -73,5 +82,14 @@ __all__ = [
     "Agent",
     "execute",
     "IMPLEMENTATIONS",
+    "ToolRetriever",
+    "EscalationBudgetController",
+    "CircuitBreaker",
+    "CircuitOpen",
+    "guarded_call",
+    "HealthMonitor",
+    "psi",
+    "Redactor",
+    "default_redactor",
     "run",
 ]
