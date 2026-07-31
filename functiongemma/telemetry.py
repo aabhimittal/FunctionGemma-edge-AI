@@ -22,9 +22,13 @@ import time
 class Telemetry:
     """Thread-safe in-process metrics + optional JSONL event log."""
 
-    def __init__(self, event_log_path=None, latency_buckets_ms=None):
+    def __init__(self, event_log_path=None, latency_buckets_ms=None, redactor=None):
         self._lock = threading.Lock()
         self.event_log_path = event_log_path
+        # A redactor (functiongemma.privacy.Redactor) scrubs PII from each event
+        # *before* it hits disk. Default off so the counter-only path is free;
+        # the server turns it on because its log contains real user requests.
+        self.redactor = redactor
         self.buckets = latency_buckets_ms or [5, 10, 25, 50, 100, 250, 500, 1000]
         self.counters = {
             "requests_total": 0,
@@ -58,6 +62,8 @@ class Telemetry:
     def _append_event(self, decision):
         event = decision.to_dict()
         event["ts"] = time.time()
+        if self.redactor is not None:
+            event = self.redactor.redact_event(event)
         with open(self.event_log_path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(event) + "\n")
 

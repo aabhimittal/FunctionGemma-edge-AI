@@ -214,11 +214,70 @@ compound requests, and injection arriving through tool results.
 
 ---
 
+## Part 5 — Scale & operations: the production hardening
+
+Parts 1–4 make one request correct and safe. Shipping to *many devices* surfaces
+a different class of failure — a crowded catalogue, a flaky network, cost drift,
+a silent quality regression, a privacy leak. This layer handles each, and every
+item has tests in [`tests/test_scale_edge_cases.py`](tests/test_scale_edge_cases.py)
+and the per-module suites.
+
+**Tool retrieval** · [`retrieval.py`](functiongemma/retrieval.py)
+A phone can register *hundreds* of tools; a 2B model's context window can't hold
+them, and more wrong options lowers accuracy. A dependency-free **BM25** index
+retrieves the top-k relevant tools per request, so the prompt stays small and
+on-topic. Drop it into the cascade with `Cascade(retriever=ToolRetriever(catalog))`.
+Swap the lexical index for embeddings behind the same `select()` seam.
+
+**Adaptive escalation budget** · [`budget.py`](functiongemma/budget.py)
+Escalation is what you pay for. When traffic drifts and the cloud rate creeps
+past budget, `EscalationBudgetController` nudges `τ` online (a proportional
+controller) to hold a target escalation rate — a control loop, not a retrain —
+with a `tau_floor` so cost control can never silently disable abstention.
+
+**Reliability / circuit breaker** · [`reliability.py`](functiongemma/reliability.py)
+The cloud tier is a network call. A `CircuitBreaker` (closed → open → half-open)
+plus `guarded_call` (deadline + exception-to-value) mean a slow or dead cloud
+**degrades to local abstention** instead of hanging every request. Wire it with
+`Cascade(cloud_breaker=CircuitBreaker(), cloud_timeout_s=…)`.
+
+**Drift & health monitoring** · [`monitor.py`](functiongemma/monitor.py)
+The scariest regression returns 200 on every request while getting worse.
+`HealthMonitor` tracks rolling abstain/escalation/repair rates *and* the
+**PSI** (Population Stability Index) of the confidence distribution vs a frozen
+baseline, surfacing `alerts()` before users notice. Served at `GET /health`.
+
+**Privacy / PII redaction** · [`privacy.py`](functiongemma/privacy.py)
+The event log is user data. A `Redactor` scrubs emails, phones, cards, SSNs at
+the boundary — conservative, idempotent, non-mutating (the device still executes
+real values; only the *log* is scrubbed). The server enables it by default.
+
+```python
+from functiongemma import Cascade, ToolRetriever, CircuitBreaker, Calibrator
+cascade = Cascade(
+    tools=big_catalog,
+    retriever=ToolRetriever(big_catalog),      # scale past the context window
+    cloud_breaker=CircuitBreaker(),            # survive a cloud outage
+    cloud_timeout_s=1.5,
+    calibrator=Calibrator(tau=0.5),
+)
+```
+
+Edge cases this layer pins down: a 300-tool catalogue routed correctly from an
+8-tool prompt, off-topic requests that abstain instead of mis-firing, a cloud
+backend that **raises** / **hangs** / is **down** (breaker opens and stops
+calling it), honest cloud abstention that must *not* trip the breaker, escalation
+held near a cost budget under drift, confidence-distribution drift raising a PSI
+alert, and emails/cards scrubbed from the telemetry log.
+
+---
+
 ## Project layout
 
 ```
 functiongemma/     core (tools·prompt·model·parser) + novel (constrained·confidence·cascade)
                    + runtime (guard·planner·executor) + mlops (registry·telemetry·config)
+                   + scale/ops (retrieval·budget·reliability·monitor·privacy)
 pipelines/         generate_data · train · evaluate · quantize · promote
 serving/           FastAPI app + schemas
 data/              tools_catalog.json · eval/golden.jsonl
@@ -239,7 +298,10 @@ benchmarks/        cascade routing latency
 4. **A cascade** buys generalist accuracy at specialist cost.
 5. **A valid call is not yet a safe call** — policy (guardrails), planning and
    sandboxed execution are what stand between JSON and the real world.
-6. **The model chooses; your code executes** — and an MLops loop keeps the model
+6. **Retrieve, don't enumerate** — a small model with the *right* few tools
+   beats one drowning in hundreds; and cost, reliability, drift and privacy are
+   dials you operate online, not properties you hope for.
+7. **The model chooses; your code executes** — and an MLops loop keeps the model
    that reaches production one that cleared the gate.
 
 MIT licensed. Educational — the "model" is a deterministic stand-in, not a
