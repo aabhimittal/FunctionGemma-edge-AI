@@ -49,6 +49,11 @@ class Decision:
     repairs: list = field(default_factory=list)
     latency_ms: float = 0.0
     error: str | None = None
+    # A well-formed but *incomplete* call (right tool, missing a required
+    # argument). It is not executable, so `call` stays None — but keeping it
+    # lets the dialogue layer (functiongemma.session) ask for the missing slot
+    # instead of dropping the user's intent on the floor.
+    partial: dict | None = None
 
     def to_dict(self):
         return {
@@ -96,25 +101,26 @@ class Cascade:
 
     def _run_tier(self, request, backend, tools, timeout_s=None):
         """One tier: prompt -> backend -> constrain -> validate. Returns
-        ``(call_or_None, repairs, error)``. Backend faults become the error
-        string (never an exception) so a flaky tier can't crash routing."""
+        ``(call_or_None, repairs, error, partial_or_None)``. Backend faults
+        become the error string (never an exception) so a flaky tier can't crash
+        routing; ``partial`` carries a well-formed but incomplete call."""
         prompt = build_prompt(tools, request)
         raw, err = guarded_call(backend, prompt, timeout_s=timeout_s)
         if err is not None:
-            return None, [], err
+            return None, [], err, None
         call, repairs = constrain(raw, tools)
         if call is None:
-            return None, repairs, "no valid call in output"
+            return None, repairs, "no valid call in output", None
         try:
-            return validate(call, tools), repairs, None
+            return validate(call, tools), repairs, None, None
         except InvalidCall as exc:
-            return None, repairs, str(exc)
+            return None, repairs, str(exc), call
 
     def _run_cloud(self, request, tools):
         """Escalate through the circuit breaker, degrading gracefully if open."""
         if self.cloud_breaker is not None and not self.cloud_breaker.allow():
-            return None, [], "cloud tier unavailable (circuit open)"
-        call, repairs, err = self._run_tier(
+            return None, [], "cloud tier unavailable (circuit open)", None
+        call, repairs, err, partial = self._run_tier(
             request, self.cloud_backend, tools, self.cloud_timeout_s
         )
         if self.cloud_breaker is not None:
@@ -125,14 +131,16 @@ class Cascade:
                 self.cloud_breaker.record_failure()
             else:
                 self.cloud_breaker.record_success()
-        return call, repairs, err
+        return call, repairs, err, partial
 
     def route(self, request):
         """Route one request and return a :class:`Decision`."""
         start = time.perf_counter()
         tools = self._tools_for(request)
 
-        edge_call, repairs, err = self._run_tier(request, self.edge_backend, tools)
+        edge_call, repairs, err, partial = self._run_tier(
+            request, self.edge_backend, tools
+        )
         conf = score(request, edge_call, tools=tools)
 
         # Gate: keep the edge answer only if it is valid AND confident enough.
@@ -143,7 +151,9 @@ class Cascade:
             )
 
         # Escalate to the larger model (through the breaker if configured).
-        cloud_call, cloud_repairs, cloud_err = self._run_cloud(request, tools)
+        cloud_call, cloud_repairs, cloud_err, cloud_partial = self._run_cloud(
+            request, tools
+        )
         latency = (time.perf_counter() - start) * 1000
         if cloud_call is not None:
             return Decision(
@@ -156,7 +166,7 @@ class Cascade:
         return Decision(
             request=request, tier="abstain", call=None, confidence=conf,
             repairs=repairs + cloud_repairs, latency_ms=latency,
-            error=cloud_err or err,
+            error=cloud_err or err, partial=cloud_partial or partial,
         )
 
 

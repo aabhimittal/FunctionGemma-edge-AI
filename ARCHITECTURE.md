@@ -77,6 +77,9 @@ sequenceDiagram
 | Surviving the network | `reliability.py` | circuit breaker + deadline → graceful degradation |
 | Catching regressions | `monitor.py` | rolling rates + confidence-drift PSI, with alerts |
 | Protecting user data | `privacy.py` | PII redaction at the log boundary |
+| Holding a conversation | `session.py` | slot filling + follow-ups, with expiring, call-bound consent |
+| Repeating safely | `idempotency.py` | fingerprinted exactly-once side effects |
+| Shipping a new model | `shadow.py` | shadow traffic + agreement verdict before promotion |
 
 ## The feedback loop
 
