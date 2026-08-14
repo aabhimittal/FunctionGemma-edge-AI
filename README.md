@@ -272,12 +272,70 @@ alert, and emails/cards scrubbed from the telemetry log.
 
 ---
 
+## Part 6 — Conversation: multi-turn state, exactly-once, safe rollout
+
+Parts 1–5 treat each request as a self-contained event. Real assistant traffic is
+a *conversation*, and conversations are where assistants get dangerous: state
+persists between turns, so a mistake on turn N can authorise an action on turn
+N+1. Tests: [`tests/test_conversation_edge_cases.py`](tests/test_conversation_edge_cases.py).
+
+**Multi-turn session** · [`session.py`](functiongemma/session.py)
+Two mechanisms above the model, because this is *state*, not intelligence:
+**slot filling** (an incomplete call becomes a question — "set a timer" → *"What
+minutes for set_timer?"* → "10 minutes" → executed) and **follow-up resolution**
+("what about Tokyo?" reuses the previous tool with a new entity). The rule is the
+planner's: **an utterance that resolves on its own is a new intent**, never
+consumed as an answer. A wrong clarification costs one turn; a wrong slot-fill
+executes something nobody asked for.
+
+The safety properties it must hold — all tested:
+- dialogue state **expires**: walking away and returning to say "yes" must not
+  fire an hour-old side effect;
+- consent is **bound to the exact call** it was issued for, never transfers to
+  the next request, and a bare "yes" with nothing pending does nothing;
+- history is **bounded** — an edge device cannot grow a conversation forever.
+
+**Exactly-once effects** · [`idempotency.py`](functiongemma/idempotency.py)
+A double-tap or a retried request must not text your boss twice. Calls are
+fingerprinted (order-independent) and suppressed inside a TTL window — with the
+three rules that are bugs if you invert them: only **successes** are cached (a
+failed send stays retryable), entries **expire**, and **read-only tools are never
+suppressed** (weather stays fresh). Suppression is reported (`duplicate: True`),
+never hidden.
+
+**Shadow / canary rollout** · [`shadow.py`](functiongemma/shadow.py)
+The offline gate says a candidate is good on the golden set; the golden set is
+not production. `ShadowRunner` runs a candidate on real traffic in parallel,
+serves **only** the incumbent's answer, and scores agreement, error rate and tier
+shift. A candidate that crashes or hangs on every request degrades to a `fail`
+verdict — not to one failed user request. `insufficient_data` is a real verdict:
+shipping on five samples is how teams talk themselves into a regression.
+
+```python
+from functiongemma import Session, Agent, IdempotencyCache
+session = Session(agent=Agent(idempotency=IdempotencyCache()))
+session.ask("what's the weather in Paris")   # kind='new'
+session.ask("what about Tokyo?")             # kind='follow_up'  -> get_weather(Tokyo)
+session.ask("send a message to Sam")         # executed
+session.ask("send a message to Sam")         # executed, duplicate=True (not re-sent)
+```
+
+Edge cases this layer pins down: stale consent after an hour, consent that must
+not transfer to the next flagged request, "yes" answering a *slot* question
+(never an approval), injection arriving in a follow-up or a slot answer, a
+hostile tool result that must not become the next turn's intent, unbounded
+history, empty/whitespace/unicode turns, double-taps across turns, and a broken
+candidate shadowed against live traffic.
+
+---
+
 ## Project layout
 
 ```
 functiongemma/     core (tools·prompt·model·parser) + novel (constrained·confidence·cascade)
                    + runtime (guard·planner·executor) + mlops (registry·telemetry·config)
                    + scale/ops (retrieval·budget·reliability·monitor·privacy)
+                   + conversation (session·idempotency·shadow)
 pipelines/         generate_data · train · evaluate · quantize · promote
 serving/           FastAPI app + schemas
 data/              tools_catalog.json · eval/golden.jsonl
@@ -301,7 +359,10 @@ benchmarks/        cascade routing latency
 6. **Retrieve, don't enumerate** — a small model with the *right* few tools
    beats one drowning in hundreds; and cost, reliability, drift and privacy are
    dials you operate online, not properties you hope for.
-7. **The model chooses; your code executes** — and an MLops loop keeps the model
+7. **Conversation is state, and state is a liability** — consent must expire and
+   bind to one call, repeated effects must happen once, and a new model earns
+   traffic by shadowing it, not by passing an offline test.
+8. **The model chooses; your code executes** — and an MLops loop keeps the model
    that reaches production one that cleared the gate.
 
 MIT licensed. Educational — the "model" is a deterministic stand-in, not a

@@ -21,6 +21,7 @@ in here:
     screen -> plan (multi-intent cascade) -> guard -> execute -> report
 """
 
+import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
@@ -29,6 +30,16 @@ from .guard import Guardrail, screen_request
 from .planner import Planner
 
 DEFAULT_TIMEOUT_S = 2.0
+
+# The parser's message for an incomplete call; the name of the absent argument
+# is what a dialogue layer needs in order to ask a useful question.
+_MISSING_RE = re.compile(r"missing argument:\s*(\w+)")
+
+
+def _missing_argument(error):
+    """Extract the absent argument name from a validation error, or None."""
+    m = _MISSING_RE.search(error or "")
+    return m.group(1) if m else None
 
 
 # --- reference tool implementations (deterministic, offline) ----------------
@@ -108,11 +119,58 @@ class Agent:
     """
 
     def __init__(self, planner=None, guardrail=None, implementations=IMPLEMENTATIONS,
-                 timeout_s=DEFAULT_TIMEOUT_S):
+                 timeout_s=DEFAULT_TIMEOUT_S, idempotency=None):
         self.planner = planner or Planner()
         self.guardrail = guardrail or Guardrail()
         self.implementations = implementations
         self.timeout_s = timeout_s
+        # Optional IdempotencyCache: suppresses a *repeated* side effect (a
+        # retry, a double-tap) inside a short window. See functiongemma.idempotency.
+        self.idempotency = idempotency
+
+    def execute_call(self, call, flags=(), confirm=False):
+        """Guard, then execute, one already-validated call.
+
+        Returns the step entry dict (``status`` plus ``call``/``outcome``/
+        ``reasons``). This is the single per-call path: :meth:`handle` uses it for
+        every planned step, and the multi-turn session layer
+        (``functiongemma.session``) uses it for a call it assembled across turns,
+        so policy and idempotency can never be bypassed by a different entry point.
+        """
+        entry = {}
+        verdict = self.guardrail.check(call, request_flags=flags)
+        entry["call"] = verdict.call or call
+        if not verdict.allowed:
+            entry.update(status="blocked", reasons=verdict.reasons)
+            return entry
+        if verdict.requires_confirmation and not confirm:
+            entry.update(status="needs_confirmation", reasons=verdict.reasons)
+            return entry
+
+        outcome, duplicate = self._execute_once(verdict.call)
+        entry.update(
+            status="executed" if outcome["ok"] else "failed",
+            outcome=outcome,
+        )
+        if duplicate:
+            # Surfaced, never hidden: the caller should know the effect was
+            # suppressed rather than performed a second time.
+            entry["duplicate"] = True
+        if verdict.reasons:
+            entry["reasons"] = verdict.reasons
+        return entry
+
+    def _execute_once(self, call):
+        """Execute, suppressing a repeated side effect. Returns (outcome, duplicate)."""
+        side_effecting = call["name"] in self.guardrail.side_effects
+        if self.idempotency is not None and side_effecting:
+            cached = self.idempotency.get(call)
+            if cached is not None:
+                return cached, True
+            outcome = execute(call, self.implementations, self.timeout_s)
+            self.idempotency.put(call, outcome)  # failures are not cached.
+            return outcome, False
+        return execute(call, self.implementations, self.timeout_s), False
 
     def handle(self, request, confirm=False):
         """Process one user request end to end.
@@ -128,25 +186,18 @@ class Agent:
             entry = {"tier": decision.tier, "confidence": decision.confidence}
             if decision.call is None:
                 entry.update(status="abstained", error=decision.error)
+                # A *incomplete* call (right tool, missing a required argument)
+                # is not executable, but it is not nothing either: surface it so
+                # a dialogue layer can ask for the slot instead of dropping the
+                # user's intent. See functiongemma.session.
+                if decision.partial is not None:
+                    entry["partial"] = decision.partial
+                    missing = _missing_argument(decision.error)
+                    if missing:
+                        entry["missing"] = missing
                 steps.append(entry)
                 continue
-
-            verdict = self.guardrail.check(decision.call, request_flags=flags)
-            entry["call"] = verdict.call or decision.call
-            if not verdict.allowed:
-                entry.update(status="blocked", reasons=verdict.reasons)
-            elif verdict.requires_confirmation and not confirm:
-                entry.update(status="needs_confirmation", reasons=verdict.reasons)
-            else:
-                outcome = execute(
-                    verdict.call, self.implementations, self.timeout_s
-                )
-                entry.update(
-                    status="executed" if outcome["ok"] else "failed",
-                    outcome=outcome,
-                )
-                if verdict.reasons:
-                    entry["reasons"] = verdict.reasons
+            entry.update(self.execute_call(decision.call, flags, confirm))
             steps.append(entry)
 
         return {
